@@ -1,4 +1,13 @@
-﻿var lines = File.ReadAllLines("sample#sh ip bgp all.txt");
+﻿string inputFile = "sample#sh ip bgp all.txt";
+string outputFile = "peers.html";
+
+var options = new Mono.Options.OptionSet { 
+    { "i|inputFile=", "inputFile", v => inputFile = v }, 
+    { "O|outputFile=", "outputFile", v=> outputFile = v }, 
+};
+options.Parse (args);
+
+var lines = File.ReadAllLines(inputFile);
 
 int startLine = 0;
 
@@ -73,4 +82,4 @@ foreach(var con in conDict)
 
 mermaidStr.Add("</pre><script type=\"module\">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';</script></body></html>");
 
-File.WriteAllLines("mermaid.html", mermaidStr.ToArray());
+File.WriteAllLines(outputFile, mermaidStr.ToArray());
