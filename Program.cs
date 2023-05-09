@@ -1,9 +1,13 @@
-﻿string inputFile = "sample#sh ip bgp all.txt";
+﻿using System.Text.RegularExpressions;
+
+string inputFile = "sample#sh ip bgp all.txt";
 string outputFile = "peers.html";
+int? localAsn = null;
 
 var options = new Mono.Options.OptionSet { 
-    { "i|inputFile=", "inputFile", v => inputFile = v }, 
-    { "O|outputFile=", "outputFile", v=> outputFile = v }, 
+	{ "i|inputFile=", "inputFile", v => inputFile = v }, 
+	{ "O|outputFile=", "outputFile", v=> outputFile = v }, 
+	{ "a|localAsn=", "local ASN", (int v)=> localAsn = v }, 
 };
 options.Parse (args);
 
@@ -14,6 +18,14 @@ int startLine = 0;
 for (int i = 0; i < lines.Length; i++)
 {
 	var line = lines[i];
+
+	if (localAsn == null && Regex.IsMatch(line, @"^\s*Local AS number\s+\d+\s*$"))
+	{
+		if (int.TryParse(Regex.Replace(line, @"^\s*Local AS number\s+(\d+)\s*$", "$1"), out int v))
+			localAsn = v;
+		continue;
+	}
+
 	var lsplit = line.Split(' ').Where(v => v != string.Empty).Select(v => v.Trim()).ToList();
 	if (lsplit.Count > 2 && lsplit[0] == "Network" && lsplit[1] == "Next" && lsplit[2] == "Hop")
 	{
@@ -27,19 +39,39 @@ var conDict = new Dictionary<int, List<int>>();
 for (int i = startLine; i < lines.Length; i++)
 {
 	if (lines[i] == string.Empty) break;
-	var lsplit = lines[i].Split(' ').Where(v => v != string.Empty).Select(v => v.Trim()).ToList();
+	var lssplit = lines[i].Trim().Split(' ');
+	var lsplit = lssplit.Where(v => v != string.Empty).Select(v => v.Trim()).ToList();
 
 	int lastProcessedASN = -1;
 
-	if (lsplit.Count < 3) continue;
+	if (lssplit[lssplit.Length - 1] != "i" && lssplit[lssplit.Length - 1] != "?")
+		continue;
 
-	int startPos = 3;
-	if (!lsplit[1].Contains("/")) startPos--;
-
-	for (int j = startPos; j < lsplit.Count; j++)
+	for (int j = lssplit.Length - 2; j > 0; j--)
 	{
-		if (lsplit[j] == "0") continue;
-		if (!int.TryParse(lsplit[j], out int asn)) break;
+		if (
+			lssplit[j] == string.Empty ||
+			!int.TryParse(lssplit[j], out int asn)
+		) {
+			if (localAsn == null)
+				break;
+			
+			int lasn = localAsn.Value;
+
+			if (!conDict.ContainsKey(lasn))
+				conDict.Add(lasn, new List<int>());
+
+			if (lastProcessedASN != -1)
+			{
+				if (!conDict[lasn].Contains(lastProcessedASN))
+					conDict[lasn].Add(lastProcessedASN);
+				if (!conDict[lastProcessedASN].Contains(lasn))
+					conDict[lastProcessedASN].Add(lasn);
+			}
+
+			break;
+		}
+
 		//Console.Write($"{asn} ");
 
 		if (!conDict.ContainsKey(asn))
@@ -47,8 +79,10 @@ for (int i = startLine; i < lines.Length; i++)
 
 		if (lastProcessedASN != -1)
 		{
-			conDict[asn].Add(lastProcessedASN);
-			conDict[lastProcessedASN].Add(asn);
+			if (!conDict[asn].Contains(lastProcessedASN))
+				conDict[asn].Add(lastProcessedASN);
+			if (!conDict[lastProcessedASN].Contains(asn))
+				conDict[lastProcessedASN].Add(asn);
 		}
 
 		lastProcessedASN = asn;
@@ -65,11 +99,12 @@ List<string> mermaidStr = new() {
 "graph LR"
 };
 
-foreach(var con in conDict)
+foreach(var con in conDict.OrderBy(v => v.Value.Distinct().Count()))
 {
 	Console.Write($"{con.Key}: ");
-	foreach(var cnct in con.Value.Distinct())
+	foreach(var cnct in con.Value.Distinct().OrderByDescending(v => conDict[v].Count))
 	{
+		if (cnct == con.Key) continue;
 		Console.Write($"{cnct} ");
 		if (!connectedLine.Contains((cnct, con.Key)))
 		{
