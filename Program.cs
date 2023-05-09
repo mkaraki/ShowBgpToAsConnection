@@ -34,7 +34,7 @@ for (int i = 0; i < lines.Length; i++)
 	}
 }
 
-var conDict = new Dictionary<int, List<int>>();
+var asTotalCons = new List<List<int>>();
 
 for (int i = startLine; i < lines.Length; i++)
 {
@@ -42,10 +42,10 @@ for (int i = startLine; i < lines.Length; i++)
 	var lssplit = lines[i].Trim().Split(' ');
 	var lsplit = lssplit.Where(v => v != string.Empty).Select(v => v.Trim()).ToList();
 
-	int lastProcessedASN = -1;
-
 	if (lssplit[lssplit.Length - 1] != "i" && lssplit[lssplit.Length - 1] != "?")
 		continue;
+
+	List<int> asCon = new();
 
 	for (int j = lssplit.Length - 2; j > 0; j--)
 	{
@@ -53,40 +53,19 @@ for (int i = startLine; i < lines.Length; i++)
 			lssplit[j] == string.Empty ||
 			!int.TryParse(lssplit[j], out int asn)
 		) {
-			if (localAsn == null)
-				break;
-			
-			int lasn = localAsn.Value;
-
-			if (!conDict.ContainsKey(lasn))
-				conDict.Add(lasn, new List<int>());
-
-			if (lastProcessedASN != -1)
-			{
-				if (!conDict[lasn].Contains(lastProcessedASN))
-					conDict[lasn].Add(lastProcessedASN);
-				if (!conDict[lastProcessedASN].Contains(lasn))
-					conDict[lastProcessedASN].Add(lasn);
-			}
-
 			break;
 		}
 
 		//Console.Write($"{asn} ");
 
-		if (!conDict.ContainsKey(asn))
-			conDict.Add(asn, new List<int>());
-
-		if (lastProcessedASN != -1)
-		{
-			if (!conDict[asn].Contains(lastProcessedASN))
-				conDict[asn].Add(lastProcessedASN);
-			if (!conDict[lastProcessedASN].Contains(asn))
-				conDict[lastProcessedASN].Add(asn);
-		}
-
-		lastProcessedASN = asn;
+		asCon.Add(asn);
 	}
+
+	if (localAsn != null)
+		asCon.Add(localAsn.Value);
+
+	asCon.Reverse();
+	asTotalCons.Add(asCon.Distinct().ToList());
 
 	//Console.WriteLine();
 	//Console.WriteLine(lines[i]);
@@ -99,20 +78,45 @@ List<string> mermaidStr = new() {
 "graph LR"
 };
 
-foreach(var con in conDict.OrderBy(v => v.Value.Distinct().Count()))
+var simplifiedPeerList = new List<List<int>>();
+
+foreach(var con in asTotalCons.OrderByDescending(v => v.Count))
 {
-	Console.Write($"{con.Key}: ");
-	foreach(var cnct in con.Value.Distinct().OrderByDescending(v => conDict[v].Count))
+	bool add = true;
+	foreach (var sp in simplifiedPeerList)
 	{
-		if (cnct == con.Key) continue;
-		Console.Write($"{cnct} ");
-		if (!connectedLine.Contains((cnct, con.Key)))
-		{
-			mermaidStr.Add($"{con.Key} --- {cnct}");
-			connectedLine.Add((con.Key, cnct));
+		if (
+			(con.Count > sp.Count) ||
+			(con.Count == sp.Count && con.SequenceEqual(sp)) ||
+			(con.SequenceEqual(sp.Take(con.Count())))
+		) {
+			add = false;
+			break;
+		}	
+	}
+	if (add)
+	{
+		simplifiedPeerList.Add(con);
+		Console.WriteLine($"Added {con.Count} length path.");
+	}
+}
+
+foreach(var con in simplifiedPeerList)
+{
+	for (int i = 0; i < con.Count - 1; i++)
+	{
+		int conFrom = con[i];
+		int conTo = con[i + 1];
+		Console.Write($"{conFrom} ");
+		if (
+			!connectedLine.Contains((conFrom, conTo)) &&
+			!connectedLine.Contains((conTo, conFrom))
+		) {
+			mermaidStr.Add($"{conFrom} --- {conTo}");
+			connectedLine.Add((conFrom, conTo));
 		}
 	}
-	Console.WriteLine();
+	Console.WriteLine(con[con.Count - 1]);
 }
 
 mermaidStr.Add("</pre><script type=\"module\">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';</script></body></html>");
