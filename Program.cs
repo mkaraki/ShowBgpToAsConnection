@@ -3,11 +3,13 @@
 string inputFile = "sample#sh ip bgp all.txt";
 string outputFile = "peers.html";
 int? localAsn = null;
+List<int> userConnectedAsn = new();
 
 var options = new Mono.Options.OptionSet { 
 	{ "i|inputFile=", "inputFile", v => inputFile = v }, 
 	{ "O|outputFile=", "outputFile", v=> outputFile = v }, 
 	{ "a|localAsn=", "local ASN", (int v)=> localAsn = v }, 
+	{ "c|connected=", "connected ASN", (int v) => userConnectedAsn.Add (v) }, 
 };
 options.Parse (args);
 
@@ -19,9 +21,9 @@ for (int i = 0; i < lines.Length; i++)
 {
 	var line = lines[i];
 
-	if (localAsn == null && Regex.IsMatch(line, @"^\s*Local AS number\s+\d+\s*$"))
+	if (localAsn == null && Regex.IsMatch(line, @"^.*Local AS( number)?\s+\d+\s*$", RegexOptions.IgnoreCase))
 	{
-		if (int.TryParse(Regex.Replace(line, @"^\s*Local AS number\s+(\d+)\s*$", "$1"), out int v))
+		if (int.TryParse(Regex.Replace(line, @"^.*Local AS( number)?\s+(?<asn>\d+)\s*$", "${asn}", RegexOptions.IgnoreCase), out int v))
 			localAsn = v;
 		continue;
 	}
@@ -56,15 +58,28 @@ for (int i = startLine; i < lines.Length; i++)
 			break;
 		}
 
+		if (asn < 1)
+			break;
+
+		//Console.Write($"{lssplit[j]} ");
 		//Console.Write($"{asn} ");
 
 		asCon.Add(asn);
+	}
+
+	if (userConnectedAsn.Count > 0)
+	{
+		while(asCon.Count > 0 && !userConnectedAsn.Contains(asCon.LastOrDefault()))
+		{
+			asCon = asCon.Take(asCon.Count - 1).ToList();
+		}
 	}
 
 	if (localAsn != null)
 		asCon.Add(localAsn.Value);
 
 	asCon.Reverse();
+
 	asTotalCons.Add(asCon.Distinct().ToList());
 
 	//Console.WriteLine();
