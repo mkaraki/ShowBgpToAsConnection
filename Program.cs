@@ -50,7 +50,11 @@ for (int i = startLine; i < lines.Length; i++)
 }
 
 List<(int, int)> connectedLine = new();
-List<string> mermaidStr = new();
+List<string> mermaidStr = new() { 
+"<DOCTYPE html>",
+"<html><head><title>BGP Peers</title></head><body><pre class=\"mermaid\">",
+"graph LR"
+};
 
 foreach(var con in conDict)
 {
@@ -67,4 +71,6 @@ foreach(var con in conDict)
 	Console.WriteLine();
 }
 
-File.WriteAllLines("mermaid.txt", mermaidStr.ToArray());
+mermaidStr.Add("</pre><script type=\"module\">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';</script></body></html>");
+
+File.WriteAllLines("mermaid.html", mermaidStr.ToArray());
