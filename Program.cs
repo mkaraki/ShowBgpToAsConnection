@@ -78,36 +78,12 @@ List<string> mermaidStr = new() {
 "graph LR"
 };
 
-var simplifiedPeerList = new List<List<int>>();
-
 foreach(var con in asTotalCons.OrderByDescending(v => v.Count))
-{
-	bool add = true;
-	foreach (var sp in simplifiedPeerList)
-	{
-		if (
-			(con.Count > sp.Count) ||
-			(con.Count == sp.Count && con.SequenceEqual(sp)) ||
-			(con.SequenceEqual(sp.Take(con.Count())))
-		) {
-			add = false;
-			break;
-		}	
-	}
-	if (add)
-	{
-		simplifiedPeerList.Add(con);
-		Console.WriteLine($"Added {con.Count} length path.");
-	}
-}
-
-foreach(var con in simplifiedPeerList)
 {
 	for (int i = 0; i < con.Count - 1; i++)
 	{
 		int conFrom = con[i];
 		int conTo = con[i + 1];
-		Console.Write($"{conFrom} ");
 		if (
 			!connectedLine.Contains((conFrom, conTo)) &&
 			!connectedLine.Contains((conTo, conFrom))
@@ -116,7 +92,6 @@ foreach(var con in simplifiedPeerList)
 			connectedLine.Add((conFrom, conTo));
 		}
 	}
-	Console.WriteLine(con[con.Count - 1]);
 }
 
 mermaidStr.Add("</pre><script type=\"module\">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';</script></body></html>");
